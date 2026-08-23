@@ -10,6 +10,9 @@ type InvitationRow = {
   token: string;
   active: boolean;
   whatsapp_phone: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
   rsvps: RsvpRow | RsvpRow[] | null;
 };
 
@@ -19,7 +22,7 @@ export async function GET() {
 
   try {
     const invitations = await supabaseRequest<InvitationRow[]>(
-      "invitations?select=id,display_name,guest_limit,token,active,whatsapp_phone,rsvps(attending,confirmed_guests)&active=eq.true&order=created_at.asc"
+      "invitations?select=id,display_name,guest_limit,token,active,whatsapp_phone,created_at,updated_at,sent_at,rsvps(attending,confirmed_guests)&order=active.desc,created_at.asc"
     );
     const rows = invitations.map(({ rsvps, ...invitation }) => {
       const rsvp = Array.isArray(rsvps) ? rsvps[0] : rsvps;
@@ -29,7 +32,10 @@ export async function GET() {
         confirmed_guests: rsvp?.confirmed_guests ?? null
       };
     });
-    return NextResponse.json({ ok: true, rows });
+    return NextResponse.json(
+      { ok: true, rows },
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
   } catch {
     return NextResponse.json({ ok: false, error: "No se pudieron cargar las invitaciones." }, { status: 500 });
   }

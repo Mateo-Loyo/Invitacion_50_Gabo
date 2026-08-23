@@ -5,12 +5,12 @@ const COOKIE = "gabo_admin";
 
 function expectedToken() {
   const sessionSecret = process.env.ADMIN_SESSION_SECRET;
-  const serverSecret = process.env.DATABASE_URL;
+  const serverSecret = process.env.SUPABASE_SECRET_KEY;
   if (!sessionSecret || !serverSecret) return null;
 
   const signingKey = crypto
     .createHash("sha256")
-    .update(`${sessionSecret}:${serverSecret}:gabo-admin-v1`)
+    .update(`${sessionSecret}:${serverSecret}:gabo-admin-v2`)
     .digest();
 
   return crypto
@@ -23,7 +23,9 @@ export async function isAdmin() {
   const token = expectedToken();
   if (!token) return false;
   const store = await cookies();
-  return store.get(COOKIE)?.value === token;
+  const current = store.get(COOKIE)?.value;
+  if (!current || current.length !== token.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(current), Buffer.from(token));
 }
 
 export function adminCookieValue() {

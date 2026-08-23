@@ -7,12 +7,16 @@ type Row = {
   display_name: string;
   guest_limit: number;
   token: string;
+  active: boolean;
   whatsapp_phone: string | null;
   attending: boolean | null;
   confirmed_guests: number | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
 };
 
-type Filter = "all" | "confirmed" | "declined" | "pending";
+type Filter = "all" | "confirmed" | "declined" | "pending" | "sent" | "unsent" | "inactive";
 
 export default function AdminClient() {
   const [password, setPassword] = useState("");
@@ -26,7 +30,11 @@ export default function AdminClient() {
   const [filter, setFilter] = useState<Filter>("all");
   const [createdLink, setCreatedLink] = useState("");
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLimit, setEditLimit] = useState(1);
+  const [editPhone, setEditPhone] = useState("");
 
   async function loadData() {
     const r = await fetch("/api/admin/data", { cache: "no-store" });
@@ -80,28 +88,86 @@ export default function AdminClient() {
     await loadData();
   }
 
-  async function deleteInvite(row: Row) {
+  async function patchInvite(id: string, payload: Record<string, unknown>) {
+    const r = await fetch(`/api/admin/invitations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || "No se pudo actualizar la invitación.");
+    return data;
+  }
+
+  function beginEdit(row: Row) {
+    setEditingId(row.id);
+    setEditName(row.display_name);
+    setEditLimit(row.guest_limit);
+    setEditPhone(row.whatsapp_phone ? `+${row.whatsapp_phone}` : "");
+    setMessage("");
+  }
+
+  async function saveEdit(row: Row) {
+    if (!editName.trim()) { setMessage("El nombre no puede quedar vacío."); return; }
+    setBusyId(row.id);
+    try {
+      await patchInvite(row.id, {
+        display_name: editName.trim(),
+        guest_limit: editLimit,
+        whatsapp_phone: editPhone.trim()
+      });
+      setEditingId(null);
+      setMessage(`Invitación de ${editName.trim()} actualizada.`);
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo actualizar.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deactivateInvite(row: Row) {
     const ok = window.confirm(
-      `¿Eliminar la invitación de ${row.display_name}?\n\nTambién se eliminará su confirmación de asistencia si ya respondió. Esta acción no se puede deshacer.`
+      `¿Desactivar la invitación de ${row.display_name}?\n\nEl enlace dejará de abrir, pero podrás recuperarlo y conservará su confirmación.`
     );
     if (!ok) return;
-
-    setDeletingId(row.id);
-    setMessage("");
+    setBusyId(row.id);
     try {
       const r = await fetch(`/api/admin/invitations/${encodeURIComponent(row.id)}`, { method: "DELETE" });
       const data = await r.json();
-      if (!data.ok) {
-        setMessage(data.error || "No se pudo eliminar la invitación.");
-        return;
-      }
+      if (!data.ok) throw new Error(data.error || "No se pudo desactivar.");
       if (createdLink.endsWith(`/i/${row.token}`)) setCreatedLink("");
-      setMessage(`Invitación de ${row.display_name} eliminada.`);
+      setMessage(`Invitación de ${row.display_name} desactivada. Puedes recuperarla desde el filtro “Inactivas”.`);
       await loadData();
-    } catch {
-      setMessage("No se pudo eliminar la invitación. Intenta nuevamente.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo desactivar.");
     } finally {
-      setDeletingId(null);
+      setBusyId(null);
+    }
+  }
+
+  async function restoreInvite(row: Row) {
+    setBusyId(row.id);
+    try {
+      await patchInvite(row.id, { active: true });
+      setMessage(`Invitación de ${row.display_name} recuperada.`);
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo recuperar.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function markAsSent(row: Row) {
+    if (row.sent_at) return;
+    const optimisticDate = new Date().toISOString();
+    setRows(current => current.map(item => item.id === row.id ? { ...item, sent_at: optimisticDate } : item));
+    try {
+      await patchInvite(row.id, { mark_sent: true });
+    } catch {
+      setRows(current => current.map(item => item.id === row.id ? { ...item, sent_at: null } : item));
+      setMessage("WhatsApp abrió, pero no se pudo registrar como enviada.");
     }
   }
 
@@ -117,14 +183,14 @@ export default function AdminClient() {
       ? "Gabo quiere compartir contigo la invitación para celebrar sus 50 años."
       : "Gabo quiere compartir con ustedes la invitación para celebrar sus 50 años.";
     const seatsText = singular
-      ? "Hemos reservado 1 lugar especialmente para ti."
-      : `Hemos reservado ${row.guest_limit} lugares especialmente para ustedes.`;
+      ? "He reservado 1 lugar especialmente para ti."
+      : `He reservado ${row.guest_limit} lugares especialmente para ustedes.`;
     const detailsText = singular
-      ? "Puedes consultar todos los detalles y confirmar tu asistencia en tu invitación personal:"
-      : "Pueden consultar todos los detalles y confirmar su asistencia en su invitación personal:";
+      ? "Consulta los detalles y confirma tu asistencia en tu invitación personal:"
+      : "Consulten los detalles y confirmen su asistencia en su invitación personal:";
     const closingText = singular
-      ? "Le dará mucho gusto celebrar contigo."
-      : "Le dará mucho gusto celebrar con ustedes.";
+      ? "Me dará mucho gusto celebrar contigo."
+      : "Me dará mucho gusto celebrar con ustedes.";
 
     const whatsappMessage = [
       `Hola, ${row.display_name}.`,
@@ -139,6 +205,7 @@ export default function AdminClient() {
       closingText
     ].join("\n");
 
+    void markAsSent(row);
     const url = `https://wa.me/${row.whatsapp_phone}?text=${encodeURIComponent(whatsappMessage)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
@@ -156,12 +223,29 @@ export default function AdminClient() {
     setMessage("Enlace copiado.");
   }
 
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows
+      .filter(row => !q || row.display_name.toLowerCase().includes(q) || (row.whatsapp_phone || "").includes(q.replace(/\D/g, "")))
+      .filter(row => {
+        if (filter === "inactive") return !row.active;
+        if (!row.active) return false;
+        if (filter === "confirmed") return row.attending === true;
+        if (filter === "declined") return row.attending === false;
+        if (filter === "pending") return row.attending === null;
+        if (filter === "sent") return Boolean(row.sent_at);
+        if (filter === "unsent") return !row.sent_at;
+        return true;
+      });
+  }, [rows, search, filter]);
+
   function exportCsv() {
-    const header = ["Invitado / familia", "WhatsApp", "Lugares asignados", "Confirmados", "Estado", "Enlace"];
-    const lines = rows.map(row => {
+    const header = ["Invitado / familia", "WhatsApp", "Lugares asignados", "Confirmados", "RSVP", "Envío", "Activa", "Enlace"];
+    const lines = filteredRows.map(row => {
       const status = row.attending === true ? "Confirmado" : row.attending === false ? "No asistirá" : "Pendiente";
+      const delivery = row.sent_at ? new Date(row.sent_at).toLocaleString("es-MX") : "Sin enviar";
       const link = `${window.location.origin}/i/${row.token}`;
-      return [row.display_name, row.whatsapp_phone ? `+${row.whatsapp_phone}` : "", row.guest_limit, row.confirmed_guests ?? "", status, link]
+      return [row.display_name, row.whatsapp_phone ? `+${row.whatsapp_phone}` : "", row.guest_limit, row.confirmed_guests ?? "", status, delivery, row.active ? "Sí" : "No", link]
         .map(value => `"${String(value).replaceAll('"', '""')}"`)
         .join(",");
     });
@@ -175,18 +259,6 @@ export default function AdminClient() {
     URL.revokeObjectURL(url);
   }
 
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows
-      .filter(row => !q || row.display_name.toLowerCase().includes(q) || (row.whatsapp_phone || "").includes(q.replace(/\D/g, "")))
-      .filter(row => {
-        if (filter === "confirmed") return row.attending === true;
-        if (filter === "declined") return row.attending === false;
-        if (filter === "pending") return row.attending === null;
-        return true;
-      });
-  }, [rows, search, filter]);
-
   if (!logged) {
     return (
       <main className="site admin adminPremium">
@@ -197,26 +269,31 @@ export default function AdminClient() {
         </div>
         <div className="card adminLogin premiumCard">
           <p className="serif adminCardTitle">Acceso de administración</p>
-          <input
-            className="textInput"
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") login(); }}
-          />
+          <label className="fieldLabel">
+            Contraseña
+            <input
+              className="textInput"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") login(); }}
+            />
+          </label>
           <button className="btn primary" onClick={login}>Entrar</button>
-          <div className="note">{message}</div>
+          <div className="note" role="status">{message}</div>
         </div>
       </main>
     );
   }
 
-  const confirmedPeople = rows.filter(r => r.attending).reduce((s, r) => s + (r.confirmed_guests || 0), 0);
-  const assignedSeats = rows.reduce((s, r) => s + r.guest_limit, 0);
-  const confirmedInvites = rows.filter(r => r.attending === true).length;
-  const declines = rows.filter(r => r.attending === false).length;
-  const pending = rows.filter(r => r.attending === null).length;
+  const activeRows = rows.filter(row => row.active);
+  const confirmedPeople = activeRows.filter(r => r.attending).reduce((sum, row) => sum + (row.confirmed_guests || 0), 0);
+  const assignedSeats = activeRows.reduce((sum, row) => sum + row.guest_limit, 0);
+  const confirmedInvites = activeRows.filter(row => row.attending === true).length;
+  const declines = activeRows.filter(row => row.attending === false).length;
+  const pending = activeRows.filter(row => row.attending === null).length;
+  const inactive = rows.filter(row => !row.active).length;
 
   return (
     <main className="site admin adminPremium">
@@ -235,6 +312,7 @@ export default function AdminClient() {
         <div className="stat"><b className="serif">{confirmedInvites}</b><span>Invitaciones confirmadas</span></div>
         <div className="stat"><b className="serif">{pending}</b><span>Pendientes</span></div>
         <div className="stat"><b className="serif">{declines}</b><span>No asistirán</span></div>
+        <div className="stat"><b className="serif">{inactive}</b><span>Inactivas</span></div>
       </div>
 
       <div className="card premiumCard adminCreateCard">
@@ -245,18 +323,24 @@ export default function AdminClient() {
           </div>
         </div>
         <div className="createGrid">
-          <input className="textInput" placeholder="Familia o invitado" value={name} onChange={e => setName(e.target.value)} />
-          <select className="textInput" value={limit} onChange={e => setLimit(Number(e.target.value))}>
-            {[1,2,3,4,5].map(n => <option key={n} value={n}>{n} {n === 1 ? "persona" : "personas"}</option>)}
-          </select>
-          <input
-            className="textInput"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="WhatsApp · 10 dígitos"
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-          />
+          <label className="fieldLabel">Familia o invitado
+            <input className="textInput" value={name} onChange={e => setName(e.target.value)} />
+          </label>
+          <label className="fieldLabel">Lugares
+            <select className="textInput" value={limit} onChange={e => setLimit(Number(e.target.value))}>
+              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n} {n === 1 ? "persona" : "personas"}</option>)}
+            </select>
+          </label>
+          <label className="fieldLabel">WhatsApp
+            <input
+              className="textInput"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="10 dígitos"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+            />
+          </label>
         </div>
         <p className="small phoneHint">Para números de México puedes escribir únicamente los 10 dígitos. El sistema agrega +52 automáticamente.</p>
         <button className="btn primary" onClick={createInvite}>Crear invitación</button>
@@ -267,7 +351,7 @@ export default function AdminClient() {
             <button className="miniButton" onClick={copyCreatedLink}>Copiar enlace</button>
           </div>
         )}
-        <div className="note">{message}</div>
+        <div className="note" role="status">{message}</div>
       </div>
 
       <div className="adminListHeader">
@@ -275,16 +359,25 @@ export default function AdminClient() {
           <div className="eyebrow gold">Invitados</div>
           <h2 className="serif adminCardTitle">Confirmaciones</h2>
         </div>
-        <button className="adminGhostButton" onClick={exportCsv}>Exportar CSV</button>
+        <button className="adminGhostButton" onClick={exportCsv}>Exportar resultados</button>
       </div>
 
       <div className="adminTools">
-        <input className="textInput searchInput" placeholder="Buscar nombre o WhatsApp" value={search} onChange={e => setSearch(e.target.value)} />
-        <select className="textInput filterSelect" value={filter} onChange={e => setFilter(e.target.value as Filter)}>
-          <option value="all">Todos los estados</option>
-          <option value="confirmed">Confirmados</option>
+        <input
+          className="textInput searchInput"
+          aria-label="Buscar por nombre o WhatsApp"
+          placeholder="Buscar nombre o WhatsApp"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <select className="textInput filterSelect" aria-label="Filtrar invitaciones" value={filter} onChange={e => setFilter(e.target.value as Filter)}>
+          <option value="all">Todas las activas</option>
+          <option value="confirmed">Confirmadas</option>
           <option value="pending">Pendientes</option>
           <option value="declined">No asistirán</option>
+          <option value="sent">Enviadas</option>
+          <option value="unsent">Sin enviar</option>
+          <option value="inactive">Inactivas</option>
         </select>
       </div>
 
@@ -301,40 +394,74 @@ export default function AdminClient() {
           </thead>
           <tbody>
             {filteredRows.map(row => {
-              const status = row.attending === true ? "Confirmado" : row.attending === false ? "No asistirá" : "Pendiente";
-              const statusClass = row.attending === true ? "statusConfirmed" : row.attending === false ? "statusDeclined" : "statusPending";
+              const status = !row.active ? "Inactiva" : row.attending === true ? "Confirmado" : row.attending === false ? "No asistirá" : "Pendiente";
+              const statusClass = !row.active ? "statusInactive" : row.attending === true ? "statusConfirmed" : row.attending === false ? "statusDeclined" : "statusPending";
+              const isEditing = editingId === row.id;
               return (
-                <tr key={row.id}>
+                <tr key={row.id} className={row.active ? "" : "inactiveRow"}>
                   <td>
-                    <strong>{row.display_name}</strong>
-                    <div className={`phoneText ${row.whatsapp_phone ? "" : "phoneMissing"}`}>
-                      {row.whatsapp_phone ? `+${row.whatsapp_phone}` : "Sin WhatsApp"}
-                    </div>
+                    {isEditing ? (
+                      <div className="editFields">
+                        <input className="textInput compactInput" aria-label="Nombre del invitado" value={editName} onChange={e => setEditName(e.target.value)} />
+                        <input className="textInput compactInput" aria-label="WhatsApp del invitado" inputMode="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+                      </div>
+                    ) : (
+                      <>
+                        <strong>{row.display_name}</strong>
+                        <div className={`phoneText ${row.whatsapp_phone ? "" : "phoneMissing"}`}>
+                          {row.whatsapp_phone ? `+${row.whatsapp_phone}` : "Sin WhatsApp"}
+                        </div>
+                        <div className={`deliveryText ${row.sent_at ? "deliverySent" : ""}`}>
+                          {row.sent_at ? `Enviada · ${new Date(row.sent_at).toLocaleDateString("es-MX")}` : "Sin enviar"}
+                        </div>
+                      </>
+                    )}
                   </td>
-                  <td>{row.guest_limit}</td>
+                  <td>
+                    {isEditing ? (
+                      <select className="textInput compactInput limitEdit" aria-label="Límite de lugares" value={editLimit} onChange={e => setEditLimit(Number(e.target.value))}>
+                        {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    ) : row.guest_limit}
+                  </td>
                   <td>{row.confirmed_guests ?? "—"}</td>
                   <td><span className={`statusPill ${statusClass}`}>{status}</span></td>
                   <td>
                     <div className="linkActions">
-                      <button
-                        className="miniButton whatsappButton"
-                        onClick={() => openWhatsApp(row)}
-                        disabled={!row.whatsapp_phone}
-                        title={row.whatsapp_phone ? "Abrir chat con el mensaje listo" : "Esta invitación no tiene WhatsApp"}
-                      >
-                        WhatsApp
-                      </button>
-                      <button className="miniButton" onClick={() => copyLink(row.token)}>
-                        {copiedToken === row.token ? "Copiado" : "Copiar"}
-                      </button>
-                      <a className="miniLink" href={`/i/${row.token}`} target="_blank" rel="noopener noreferrer">Abrir</a>
-                      <button
-                        className="miniButton dangerButton"
-                        onClick={() => deleteInvite(row)}
-                        disabled={deletingId === row.id}
-                      >
-                        {deletingId === row.id ? "Eliminando..." : "Eliminar"}
-                      </button>
+                      {isEditing ? (
+                        <>
+                          <button className="miniButton primaryMiniButton" onClick={() => saveEdit(row)} disabled={busyId === row.id}>
+                            {busyId === row.id ? "Guardando..." : "Guardar"}
+                          </button>
+                          <button className="miniButton" onClick={() => setEditingId(null)}>Cancelar</button>
+                        </>
+                      ) : row.active ? (
+                        <>
+                          <button
+                            className="miniButton whatsappButton"
+                            onClick={() => openWhatsApp(row)}
+                            disabled={!row.whatsapp_phone}
+                            title={row.whatsapp_phone ? "Abrir chat con el mensaje listo" : "Esta invitación no tiene WhatsApp"}
+                          >
+                            WhatsApp
+                          </button>
+                          <button className="miniButton" onClick={() => copyLink(row.token)}>
+                            {copiedToken === row.token ? "Copiado" : "Copiar"}
+                          </button>
+                          <a className="miniLink" href={`/i/${row.token}`} target="_blank" rel="noopener noreferrer">Abrir</a>
+                          <button className="miniButton" onClick={() => beginEdit(row)}>Editar</button>
+                          <button className="miniButton dangerButton" onClick={() => deactivateInvite(row)} disabled={busyId === row.id}>
+                            {busyId === row.id ? "Desactivando..." : "Desactivar"}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="miniButton" onClick={() => beginEdit(row)}>Editar</button>
+                          <button className="miniButton restoreButton" onClick={() => restoreInvite(row)} disabled={busyId === row.id}>
+                            {busyId === row.id ? "Recuperando..." : "Recuperar"}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

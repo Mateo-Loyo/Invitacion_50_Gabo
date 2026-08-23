@@ -7,7 +7,9 @@ create table if not exists public.invitations (
   guest_limit smallint not null check (guest_limit between 1 and 5),
   whatsapp_phone text,
   active boolean not null default true,
-  created_at timestamptz not null default now()
+  sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.rsvps (
@@ -16,6 +18,9 @@ create table if not exists public.rsvps (
   confirmed_guests smallint not null check (confirmed_guests between 0 and 5),
   updated_at timestamptz not null default now()
 );
+
+create index if not exists invitations_active_created_at_idx
+  on public.invitations (active, created_at);
 
 alter table public.invitations enable row level security;
 alter table public.rsvps enable row level security;
