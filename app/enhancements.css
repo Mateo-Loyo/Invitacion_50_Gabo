@@ -1,0 +1,1 @@
+.btn,.hotelCard,.calendarButton,.choice label{transition:transform .2s ease,filter .2s ease,background .2s ease}.btn:hover,.hotelCard:hover,.calendarButton:hover{transform:translateY(-2px);filter:brightness(1.05)}.confirmButton:disabled{opacity:.62;cursor:wait}
