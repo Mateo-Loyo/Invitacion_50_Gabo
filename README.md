@@ -33,3 +33,5 @@ npm start
 Panel privado: `/admin`
 
 Diagnóstico privado de conexión: `/api/health` (no expone credenciales).
+
+Preview de migración a Supabase Secret Key.
