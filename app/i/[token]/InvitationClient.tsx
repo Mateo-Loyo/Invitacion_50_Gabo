@@ -31,7 +31,6 @@ export default function InvitationClient({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
   const [savedNow, setSavedNow] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [showRsvpShortcut, setShowRsvpShortcut] = useState(true);
   const [count, setCount] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
@@ -60,18 +59,6 @@ export default function InvitationClient({ token }: { token: string }) {
       });
     return () => controller.abort();
   }, [token, loadAttempt]);
-
-  useEffect(() => {
-    if (!invite) return;
-    const rsvpSection = document.getElementById("rsvp");
-    if (!rsvpSection) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setShowRsvpShortcut(!entry.isIntersecting),
-      { threshold: 0.18 }
-    );
-    observer.observe(rsvpSection);
-    return () => observer.disconnect();
-  }, [invite]);
 
   useEffect(() => {
     const eventDate = new Date("2026-10-10T14:30:00-06:00");
@@ -150,13 +137,7 @@ export default function InvitationClient({ token }: { token: string }) {
   const deadlinePassed = Date.now() > RSVP_DEADLINE.getTime();
 
   return (
-    <main className="site invitationSite">
-      {showRsvpShortcut && (
-        <a className="rsvpShortcut" href="#rsvp" aria-label={hasResponse ? "Modificar confirmación de asistencia" : "Ir a confirmar asistencia"}>
-          <span>{hasResponse ? "Modificar respuesta" : "Confirmar asistencia"}</span>
-          <strong aria-hidden="true">↓</strong>
-        </a>
-      )}
+    <main className="site">
       <section className="section hero cubanHero">
         <div className="heroShade" />
         <div className="heroInner">
