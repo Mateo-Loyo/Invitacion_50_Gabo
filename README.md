@@ -31,3 +31,5 @@ npm start
 ```
 
 Panel privado: `/admin`
+
+Diagnóstico privado de conexión: `/api/health` (no expone credenciales).
