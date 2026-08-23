@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/adminAuth";
-import { db, hasDatabase } from "@/lib/db";
+import { hasDatabase, supabaseRequest } from "@/lib/db";
 
 function normalizeWhatsApp(value: unknown) {
   let digits = String(value || "").replace(/\D/g, "");
@@ -15,7 +15,14 @@ function normalizeWhatsApp(value: unknown) {
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ ok: false }, { status: 401 });
   if (!hasDatabase()) return NextResponse.json({ ok: false, error: "Supabase aún no está conectado." }, { status: 503 });
-  const body = await req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "Solicitud no válida." }, { status: 400 });
+  }
+
   const displayName = String(body.display_name || "").trim();
   const guestLimit = Number(body.guest_limit);
   const whatsappPhone = normalizeWhatsApp(body.whatsapp_phone);
@@ -25,12 +32,14 @@ export async function POST(req: Request) {
   if (whatsappPhone === undefined) {
     return NextResponse.json({ ok: false, error: "WhatsApp no válido. Para México escribe los 10 dígitos del celular." }, { status: 400 });
   }
+
   const token = "GB-" + crypto.randomBytes(9).toString("base64url");
   try {
-    await db()`
-      insert into public.invitations (display_name, guest_limit, token, whatsapp_phone)
-      values (${displayName}, ${guestLimit}, ${token}, ${whatsappPhone})
-    `;
+    await supabaseRequest<void>("invitations", {
+      method: "POST",
+      body: { display_name: displayName, guest_limit: guestLimit, token, whatsapp_phone: whatsappPhone },
+      prefer: "return=minimal"
+    });
     return NextResponse.json({ ok: true, token });
   } catch {
     return NextResponse.json({ ok: false, error: "No se pudo crear la invitación." }, { status: 500 });
