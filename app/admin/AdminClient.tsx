@@ -15,10 +15,13 @@ type Row = {
   updated_at: string;
   sent_at: string | null;
   reminder_sent_at: string | null;
+  opened_at: string | null;
+  last_opened_at: string | null;
+  open_count: number;
   response_updated_at: string | null;
 };
 
-type Filter = "all" | "confirmed" | "declined" | "pending" | "sent" | "unsent" | "reminded" | "inactive";
+type Filter = "all" | "confirmed" | "declined" | "pending" | "sent" | "unsent" | "reminded" | "opened" | "unopened" | "inactive";
 
 const RSVP_DEADLINE_TEXT = "25 de septiembre de 2026";
 
@@ -41,11 +44,15 @@ export default function AdminClient() {
   const [editPhone, setEditPhone] = useState("");
 
   async function loadData() {
-    const r = await fetch("/api/admin/data", { cache: "no-store" });
-    if (r.status === 401) { setLogged(false); return; }
-    const data = await r.json();
-    if (data.ok) { setRows(data.rows); setLogged(true); }
-    else setMessage(data.error || "No se pudo cargar el panel.");
+    try {
+      const r = await fetch("/api/admin/data", { cache: "no-store" });
+      if (r.status === 401) { setLogged(false); return; }
+      const data = await r.json();
+      if (data.ok) { setRows(data.rows); setLogged(true); }
+      else setMessage(data.error || "No se pudo cargar el panel.");
+    } catch {
+      setMessage("No se pudo actualizar el panel. Revisa tu conexión e intenta nuevamente.");
+    }
   }
 
   useEffect(() => { loadData(); }, []);
@@ -281,19 +288,23 @@ export default function AdminClient() {
         if (filter === "sent") return Boolean(row.sent_at);
         if (filter === "unsent") return !row.sent_at;
         if (filter === "reminded") return Boolean(row.reminder_sent_at);
+        if (filter === "opened") return Boolean(row.opened_at);
+        if (filter === "unopened") return !row.opened_at;
         return true;
       });
   }, [rows, search, filter]);
 
   function exportCsv() {
-    const header = ["Invitado / familia", "WhatsApp", "Lugares asignados", "Confirmados", "RSVP", "Fecha de respuesta", "Envío", "Recordatorio", "Activa", "Enlace"];
+    const header = ["Invitado / familia", "WhatsApp", "Lugares asignados", "Confirmados", "RSVP", "Fecha de respuesta", "Envío", "Recordatorio", "Primera apertura", "Última apertura", "Aperturas", "Activa", "Enlace"];
     const lines = filteredRows.map(row => {
       const status = row.attending === true ? "Confirmado" : row.attending === false ? "No asistirá" : "Pendiente";
       const delivery = row.sent_at ? new Date(row.sent_at).toLocaleString("es-MX") : "Sin enviar";
       const reminder = row.reminder_sent_at ? new Date(row.reminder_sent_at).toLocaleString("es-MX") : "Sin recordatorio";
       const responseDate = row.response_updated_at ? new Date(row.response_updated_at).toLocaleString("es-MX") : "";
+      const firstOpened = row.opened_at ? new Date(row.opened_at).toLocaleString("es-MX") : "Sin abrir";
+      const lastOpened = row.last_opened_at ? new Date(row.last_opened_at).toLocaleString("es-MX") : "";
       const link = `${window.location.origin}/i/${row.token}`;
-      return [row.display_name, row.whatsapp_phone ? `+${row.whatsapp_phone}` : "", row.guest_limit, row.confirmed_guests ?? "", status, responseDate, delivery, reminder, row.active ? "Sí" : "No", link]
+      return [row.display_name, row.whatsapp_phone ? `+${row.whatsapp_phone}` : "", row.guest_limit, row.confirmed_guests ?? "", status, responseDate, delivery, reminder, firstOpened, lastOpened, row.open_count, row.active ? "Sí" : "No", link]
         .map(value => `"${String(value).replaceAll('"', '""')}"`)
         .join(",");
     });
@@ -342,6 +353,9 @@ export default function AdminClient() {
   const declines = activeRows.filter(row => row.attending === false).length;
   const pending = activeRows.filter(row => row.attending === null).length;
   const inactive = rows.filter(row => !row.active).length;
+  const opened = activeRows.filter(row => row.opened_at).length;
+  const totalOpens = activeRows.reduce((sum, row) => sum + row.open_count, 0);
+  const responseRate = activeRows.length ? Math.round(((confirmedInvites + declines) / activeRows.length) * 100) : 0;
 
   return (
     <main className="site admin adminPremium">
@@ -361,6 +375,9 @@ export default function AdminClient() {
         <div className="stat"><b className="serif">{pending}</b><span>Pendientes</span></div>
         <div className="stat"><b className="serif">{declines}</b><span>No asistirán</span></div>
         <div className="stat"><b className="serif">{inactive}</b><span>Inactivas</span></div>
+        <div className="stat engagementStat"><b className="serif">{opened}</b><span>Invitaciones abiertas</span></div>
+        <div className="stat engagementStat"><b className="serif">{totalOpens}</b><span>Aperturas totales</span></div>
+        <div className="stat engagementStat"><b className="serif">{responseRate}%</b><span>Tasa de respuesta</span></div>
       </div>
 
       <div className="card premiumCard adminCreateCard">
@@ -407,7 +424,10 @@ export default function AdminClient() {
           <div className="eyebrow gold">Invitados</div>
           <h2 className="serif adminCardTitle">Confirmaciones</h2>
         </div>
-        <button className="adminGhostButton" onClick={exportCsv}>Exportar resultados</button>
+        <div className="adminHeaderActions">
+          <button className="adminGhostButton" onClick={loadData}>Actualizar</button>
+          <button className="adminGhostButton" onClick={exportCsv}>Exportar resultados</button>
+        </div>
       </div>
 
       <div className="adminTools">
@@ -426,6 +446,8 @@ export default function AdminClient() {
           <option value="sent">Enviadas</option>
           <option value="unsent">Sin enviar</option>
           <option value="reminded">Con recordatorio</option>
+          <option value="opened">Ya abiertas</option>
+          <option value="unopened">Sin abrir</option>
           <option value="inactive">Inactivas</option>
         </select>
       </div>
@@ -468,6 +490,11 @@ export default function AdminClient() {
                             Recordatorio · {new Date(row.reminder_sent_at).toLocaleDateString("es-MX")}
                           </div>
                         )}
+                        <div className={`deliveryText ${row.opened_at ? "openSeen" : "openUnseen"}`}>
+                          {row.opened_at
+                            ? `Abierta ${row.open_count} ${row.open_count === 1 ? "vez" : "veces"} · ${new Date(row.last_opened_at || row.opened_at).toLocaleDateString("es-MX")}`
+                            : "Aún no abierta"}
+                        </div>
                       </>
                     )}
                   </td>

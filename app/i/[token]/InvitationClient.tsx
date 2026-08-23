@@ -30,21 +30,48 @@ export default function InvitationClient({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedNow, setSavedNow] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [showRsvpShortcut, setShowRsvpShortcut] = useState(true);
   const [count, setCount] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    fetch(`/api/invite/${encodeURIComponent(token)}`, { cache: "no-store" })
-      .then(r => r.json())
+    const controller = new AbortController();
+    setLoading(true);
+    setMessage("");
+    fetch(`/api/invite/${encodeURIComponent(token)}`, { cache: "no-store", signal: controller.signal })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok || !data.ok) throw new Error(data.error || "Invitación no encontrada.");
+        return data;
+      })
       .then(data => {
-        if (!data.ok) throw new Error(data.error || "Invitación no encontrada.");
         const inv: Invite = data.invitation;
         setInvite(inv);
         setAttending(inv.attending);
-        if (inv.confirmed_guests && inv.confirmed_guests > 0) setGuests(inv.confirmed_guests);
+        setGuests(inv.confirmed_guests && inv.confirmed_guests > 0 ? inv.confirmed_guests : 1);
       })
-      .catch(err => setMessage(err.message))
-      .finally(() => setLoading(false));
-  }, [token]);
+      .catch(error => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setInvite(null);
+        setMessage(error instanceof Error ? error.message : "No fue posible abrir la invitación.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [token, loadAttempt]);
+
+  useEffect(() => {
+    if (!invite) return;
+    const rsvpSection = document.getElementById("rsvp");
+    if (!rsvpSection) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowRsvpShortcut(!entry.isIntersecting),
+      { threshold: 0.18 }
+    );
+    observer.observe(rsvpSection);
+    return () => observer.disconnect();
+  }, [invite]);
 
   useEffect(() => {
     const eventDate = new Date("2026-10-10T14:30:00-06:00");
@@ -114,8 +141,8 @@ export default function InvitationClient({ token }: { token: string }) {
     }
   }
 
-  if (loading) return <main className="site centerPage"><p>Cargando invitación…</p></main>;
-  if (!invite) return <main className="site centerPage"><p>{message || "Invitación no encontrada."}</p></main>;
+  if (loading) return <main className="site centerPage invitationState" aria-busy="true"><span className="loadingDot" aria-hidden="true" /><p>Cargando tu invitación…</p></main>;
+  if (!invite) return <main className="site centerPage invitationState"><div className="stateMark" aria-hidden="true">✦</div><h1 className="serif">No pudimos abrir la invitación</h1><p>{message || "Revisa el enlace e intenta nuevamente."}</p><button type="button" className="btn primary" onClick={() => setLoadAttempt(value => value + 1)}>Intentar de nuevo</button></main>;
 
   const plural = invite.guest_limit > 1;
   const hasResponse = invite.attending !== null;
@@ -123,7 +150,13 @@ export default function InvitationClient({ token }: { token: string }) {
   const deadlinePassed = Date.now() > RSVP_DEADLINE.getTime();
 
   return (
-    <main className="site">
+    <main className="site invitationSite">
+      {showRsvpShortcut && (
+        <a className="rsvpShortcut" href="#rsvp" aria-label={hasResponse ? "Modificar confirmación de asistencia" : "Ir a confirmar asistencia"}>
+          <span>{hasResponse ? "Modificar respuesta" : "Confirmar asistencia"}</span>
+          <strong aria-hidden="true">↓</strong>
+        </a>
+      )}
       <section className="section hero cubanHero">
         <div className="heroShade" />
         <div className="heroInner">
@@ -146,7 +179,7 @@ export default function InvitationClient({ token }: { token: string }) {
           <Count number={count.days} label="Días" /><Count number={count.hours} label="Horas" pad />
           <Count number={count.minutes} label="Minutos" pad /><Count number={count.seconds} label="Segundos" pad />
         </div>
-        <button className="calendarButton" onClick={addToCalendar}>＋ Agregar al calendario</button>
+        <button type="button" className="calendarButton" onClick={addToCalendar}>＋ Agregar al calendario</button>
       </section>
 
       <section className="section fiestaSection">
@@ -200,14 +233,16 @@ export default function InvitationClient({ token }: { token: string }) {
               {plural ? <>He reservado <strong className="gold">{invite.guest_limit} lugares</strong> para ustedes.</> : <>He reservado <strong className="gold">1 lugar</strong> especialmente para ti.</>}
             </p>
             {hasResponse && <div className={`responseSummary ${invite.attending ? "responseYes" : "responseNo"}`}><div className="responseLabel">Respuesta registrada</div><strong className="serif">{invite.attending ? `${currentConfirmed} ${currentConfirmed === 1 ? "persona confirmada" : "personas confirmadas"}` : "No podrán acompañarnos"}</strong><p>Puedes modificar tu respuesta aquí mismo.</p></div>}
-            <p className="serif question">¿Me acompañarán?</p>
-            <div className="choice">
-              <label className={attending === true ? "choiceSelected" : ""}><input type="radio" name="attendance" checked={attending === true} onChange={() => { setAttending(true); setSavedNow(false); }} /><span>{plural ? "Sí, ahí estaremos" : "Sí, ahí estaré"}</span></label>
-              <label className={attending === false ? "choiceSelected" : ""}><input type="radio" name="attendance" checked={attending === false} onChange={() => { setAttending(false); setSavedNow(false); }} /><span>{plural ? "No podremos acompañarte" : "No podré acompañarte"}</span></label>
-            </div>
-            {attending === true && <div className="pickerWrap"><div className="serif">{plural ? "¿Cuántos me acompañarán?" : "Tu lugar está reservado"}</div>{plural ? <><div className="picker"><button className="round" onClick={() => { setGuests(Math.max(1, guests - 1)); setSavedNow(false); }} aria-label="Restar persona">−</button><div className="guestNum serif">{guests}</div><button className="round" onClick={() => { setGuests(Math.min(invite.guest_limit, guests + 1)); setSavedNow(false); }} aria-label="Agregar persona">+</button></div><div className="note">Máximo autorizado: {invite.guest_limit} personas.</div></> : <div className="singleGuestMark"><span>✓</span> 1 persona</div>}</div>}
-            <button className="btn primary confirmButton" onClick={confirm} disabled={saving}>{saving ? "Guardando..." : hasResponse ? "Actualizar confirmación" : "Confirmar asistencia"}</button>
-            {savedNow && <div className="confirmationSuccess" role="status"><div className="successIcon">✓</div><div><strong className="serif">Tu respuesta quedó guardada</strong><p>{attending ? `Confirmamos ${guests} ${guests === 1 ? "lugar" : "lugares"}.` : "Gracias por avisarme."}</p><small>Puedes modificar tu respuesta en cualquier momento desde este mismo enlace.</small></div></div>}
+            <fieldset className="choiceFieldset">
+              <legend className="serif question">¿Me acompañarán?</legend>
+              <div className="choice">
+                <label className={attending === true ? "choiceSelected" : ""}><input type="radio" name="attendance" checked={attending === true} onChange={() => { setAttending(true); setSavedNow(false); }} /><span>{plural ? "Sí, ahí estaremos" : "Sí, ahí estaré"}</span></label>
+                <label className={attending === false ? "choiceSelected" : ""}><input type="radio" name="attendance" checked={attending === false} onChange={() => { setAttending(false); setSavedNow(false); }} /><span>{plural ? "No podremos acompañarte" : "No podré acompañarte"}</span></label>
+              </div>
+            </fieldset>
+            {attending === true && <div className="pickerWrap"><div className="serif">{plural ? "¿Cuántos me acompañarán?" : "Tu lugar está reservado"}</div>{plural ? <><div className="picker"><button type="button" className="round" onClick={() => { setGuests(Math.max(1, guests - 1)); setSavedNow(false); }} aria-label="Restar persona">−</button><div className="guestNum serif" aria-live="polite">{guests}</div><button type="button" className="round" onClick={() => { setGuests(Math.min(invite.guest_limit, guests + 1)); setSavedNow(false); }} aria-label="Agregar persona">+</button></div><div className="note">Máximo autorizado: {invite.guest_limit} personas.</div></> : <div className="singleGuestMark"><span>✓</span> 1 persona</div>}</div>}
+            <button type="button" className="btn primary confirmButton" onClick={confirm} disabled={saving}>{saving ? "Guardando..." : hasResponse ? "Actualizar confirmación" : "Confirmar asistencia"}</button>
+            {savedNow && <div className="confirmationSuccess" role="status" aria-live="polite"><div className="successIcon">✓</div><div><strong className="serif">Tu respuesta quedó guardada</strong><p>{attending ? `Confirmamos ${guests} ${guests === 1 ? "lugar" : "lugares"}.` : "Gracias por avisarme."}</p><small>Puedes modificar tu respuesta en cualquier momento desde este mismo enlace.</small></div></div>}
             {message && <div className="note errorNote" role="status">{message}</div>}
           </div>
         </div>
@@ -223,4 +258,3 @@ export default function InvitationClient({ token }: { token: string }) {
 function Count({ number, label, pad = false }: { number: number; label: string; pad?: boolean }) {
   return <div className="count"><div className="n serif">{pad ? String(number).padStart(2, "0") : number}</div><div className="l">{label}</div></div>;
 }
-

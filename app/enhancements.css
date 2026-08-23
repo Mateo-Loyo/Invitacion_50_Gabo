@@ -6,3 +6,18 @@
 .rsvpDeadline em{font-size:.78rem;color:#d7d0c2}
 .rsvpDeadline.deadlinePassed{border-color:rgba(211,165,76,.72)}
 .confirmationSuccess small{display:block;margin-top:.35rem;line-height:1.45;color:#d5cdbd}
+
+.invitationSite{padding-bottom:76px}
+.rsvpShortcut{position:fixed;z-index:50;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:.65rem;width:min(calc(100% - 32px),420px);padding:13px 18px;border:1px solid rgba(232,192,105,.78);border-radius:999px;background:rgba(20,36,31,.96);box-shadow:0 15px 36px rgba(0,0,0,.32);color:#f6e6bf;text-decoration:none;font-size:.76rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(12px);animation:shortcutIn .28s ease-out}
+.rsvpShortcut strong{color:#d9aa4d;font-size:1rem}
+.rsvpShortcut:focus-visible{outline:3px solid #f2c86f;outline-offset:3px}
+.choiceFieldset{margin:0;padding:0;border:0;min-width:0}
+.choiceFieldset .question{display:block;width:100%}
+.invitationState{gap:.7rem;padding:32px;text-align:center;background:radial-gradient(circle at 50% 30%,rgba(189,145,60,.12),transparent 44%),#16231f;color:#f4ead5}
+.invitationState h1{margin:0;font-size:1.65rem;font-weight:500}
+.invitationState p{max-width:430px;margin:0 0 .45rem;color:#d8cfbd;line-height:1.55}
+.stateMark{color:#d5a548;font-size:1.6rem}
+.loadingDot{width:26px;height:26px;border:2px solid rgba(222,181,92,.3);border-top-color:#deb55c;border-radius:50%;animation:loadingSpin .8s linear infinite}
+@keyframes shortcutIn{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes loadingSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.rsvpShortcut,.loadingDot{animation:none}.btn,.hotelCard,.calendarButton,.choice label{transition:none}}

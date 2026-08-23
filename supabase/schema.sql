@@ -9,6 +9,9 @@ create table if not exists public.invitations (
   active boolean not null default true,
   sent_at timestamptz,
   reminder_sent_at timestamptz,
+  opened_at timestamptz,
+  last_opened_at timestamptz,
+  open_count integer not null default 0 check (open_count >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

@@ -2,6 +2,14 @@
 
 Invitación privada con enlaces individuales, RSVP, límite de asistentes, WhatsApp, calendario, mapas, hoteles y panel administrativo.
 
+## Funciones de operación
+
+- Confirmación modificable con fecha límite sugerida.
+- Seguimiento de envío y recordatorio por WhatsApp.
+- Registro de primera apertura, última apertura y total de aperturas por invitación.
+- Filtros, tasa de respuesta y exportación CSV desde `/admin`.
+- El seguimiento no almacena IP, ubicación, navegador ni información adicional del invitado.
+
 ## Configuración
 
 Variables requeridas:

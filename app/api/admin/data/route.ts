@@ -14,6 +14,9 @@ type InvitationRow = {
   updated_at: string;
   sent_at: string | null;
   reminder_sent_at: string | null;
+  opened_at: string | null;
+  last_opened_at: string | null;
+  open_count: number;
   rsvps: RsvpRow | RsvpRow[] | null;
 };
 
@@ -23,7 +26,7 @@ export async function GET() {
 
   try {
     const invitations = await supabaseRequest<InvitationRow[]>(
-      "invitations?select=id,display_name,guest_limit,token,active,whatsapp_phone,created_at,updated_at,sent_at,reminder_sent_at,rsvps(attending,confirmed_guests,updated_at)&order=active.desc,created_at.asc"
+      "invitations?select=id,display_name,guest_limit,token,active,whatsapp_phone,created_at,updated_at,sent_at,reminder_sent_at,opened_at,last_opened_at,open_count,rsvps(attending,confirmed_guests,updated_at)&order=active.desc,created_at.asc"
     );
     const rows = invitations.map(({ rsvps, ...invitation }) => {
       const rsvp = Array.isArray(rsvps) ? rsvps[0] : rsvps;
