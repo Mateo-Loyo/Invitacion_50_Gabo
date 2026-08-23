@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/adminAuth";
 import { hasDatabase, supabaseRequest } from "@/lib/db";
 
-type RsvpRow = { attending: boolean; confirmed_guests: number };
+type RsvpRow = { attending: boolean; confirmed_guests: number; updated_at: string };
 type InvitationRow = {
   id: string;
   display_name: string;
@@ -13,6 +13,7 @@ type InvitationRow = {
   created_at: string;
   updated_at: string;
   sent_at: string | null;
+  reminder_sent_at: string | null;
   rsvps: RsvpRow | RsvpRow[] | null;
 };
 
@@ -22,14 +23,15 @@ export async function GET() {
 
   try {
     const invitations = await supabaseRequest<InvitationRow[]>(
-      "invitations?select=id,display_name,guest_limit,token,active,whatsapp_phone,created_at,updated_at,sent_at,rsvps(attending,confirmed_guests)&order=active.desc,created_at.asc"
+      "invitations?select=id,display_name,guest_limit,token,active,whatsapp_phone,created_at,updated_at,sent_at,reminder_sent_at,rsvps(attending,confirmed_guests,updated_at)&order=active.desc,created_at.asc"
     );
     const rows = invitations.map(({ rsvps, ...invitation }) => {
       const rsvp = Array.isArray(rsvps) ? rsvps[0] : rsvps;
       return {
         ...invitation,
         attending: rsvp?.attending ?? null,
-        confirmed_guests: rsvp?.confirmed_guests ?? null
+        confirmed_guests: rsvp?.confirmed_guests ?? null,
+        response_updated_at: rsvp?.updated_at ?? null
       };
     });
     return NextResponse.json(

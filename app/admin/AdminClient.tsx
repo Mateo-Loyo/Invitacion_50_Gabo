@@ -14,9 +14,13 @@ type Row = {
   created_at: string;
   updated_at: string;
   sent_at: string | null;
+  reminder_sent_at: string | null;
+  response_updated_at: string | null;
 };
 
-type Filter = "all" | "confirmed" | "declined" | "pending" | "sent" | "unsent" | "inactive";
+type Filter = "all" | "confirmed" | "declined" | "pending" | "sent" | "unsent" | "reminded" | "inactive";
+
+const RSVP_DEADLINE_TEXT = "25 de septiembre de 2026";
 
 export default function AdminClient() {
   const [password, setPassword] = useState("");
@@ -171,6 +175,17 @@ export default function AdminClient() {
     }
   }
 
+  async function markReminderAsSent(row: Row) {
+    const optimisticDate = new Date().toISOString();
+    setRows(current => current.map(item => item.id === row.id ? { ...item, reminder_sent_at: optimisticDate } : item));
+    try {
+      await patchInvite(row.id, { mark_reminder: true });
+    } catch {
+      setRows(current => current.map(item => item.id === row.id ? { ...item, reminder_sent_at: row.reminder_sent_at } : item));
+      setMessage("WhatsApp abrió, pero no se pudo registrar el recordatorio.");
+    }
+  }
+
   function openWhatsApp(row: Row) {
     if (!row.whatsapp_phone) {
       setMessage(`La invitación de ${row.display_name} no tiene un WhatsApp registrado.`);
@@ -202,11 +217,41 @@ export default function AdminClient() {
       detailsText,
       link,
       "",
+      `Te agradeceré confirmar antes del ${RSVP_DEADLINE_TEXT}.`,
+      "",
       closingText
     ].join("\n");
 
     void markAsSent(row);
     const url = `https://wa.me/${row.whatsapp_phone}?text=${encodeURIComponent(whatsappMessage)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function openReminder(row: Row) {
+    if (!row.whatsapp_phone) {
+      setMessage(`La invitación de ${row.display_name} no tiene un WhatsApp registrado.`);
+      return;
+    }
+
+    const link = `${window.location.origin}/i/${row.token}`;
+    const singular = row.guest_limit === 1;
+    const reminderMessage = [
+      `Hola, ${row.display_name}.`,
+      "",
+      "Solo paso a recordarte la invitación para celebrar los 50 años de Gabo.",
+      "",
+      singular
+        ? "Tienes 1 lugar reservado especialmente para ti."
+        : `Tienen ${row.guest_limit} lugares reservados.`,
+      "",
+      `Por favor confirma tu asistencia antes del ${RSVP_DEADLINE_TEXT}:`,
+      link,
+      "",
+      "¡Nos dará mucho gusto celebrar juntos!"
+    ].join("\n");
+
+    void markReminderAsSent(row);
+    const url = `https://wa.me/${row.whatsapp_phone}?text=${encodeURIComponent(reminderMessage)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -235,17 +280,20 @@ export default function AdminClient() {
         if (filter === "pending") return row.attending === null;
         if (filter === "sent") return Boolean(row.sent_at);
         if (filter === "unsent") return !row.sent_at;
+        if (filter === "reminded") return Boolean(row.reminder_sent_at);
         return true;
       });
   }, [rows, search, filter]);
 
   function exportCsv() {
-    const header = ["Invitado / familia", "WhatsApp", "Lugares asignados", "Confirmados", "RSVP", "Envío", "Activa", "Enlace"];
+    const header = ["Invitado / familia", "WhatsApp", "Lugares asignados", "Confirmados", "RSVP", "Fecha de respuesta", "Envío", "Recordatorio", "Activa", "Enlace"];
     const lines = filteredRows.map(row => {
       const status = row.attending === true ? "Confirmado" : row.attending === false ? "No asistirá" : "Pendiente";
       const delivery = row.sent_at ? new Date(row.sent_at).toLocaleString("es-MX") : "Sin enviar";
+      const reminder = row.reminder_sent_at ? new Date(row.reminder_sent_at).toLocaleString("es-MX") : "Sin recordatorio";
+      const responseDate = row.response_updated_at ? new Date(row.response_updated_at).toLocaleString("es-MX") : "";
       const link = `${window.location.origin}/i/${row.token}`;
-      return [row.display_name, row.whatsapp_phone ? `+${row.whatsapp_phone}` : "", row.guest_limit, row.confirmed_guests ?? "", status, delivery, row.active ? "Sí" : "No", link]
+      return [row.display_name, row.whatsapp_phone ? `+${row.whatsapp_phone}` : "", row.guest_limit, row.confirmed_guests ?? "", status, responseDate, delivery, reminder, row.active ? "Sí" : "No", link]
         .map(value => `"${String(value).replaceAll('"', '""')}"`)
         .join(",");
     });
@@ -377,6 +425,7 @@ export default function AdminClient() {
           <option value="declined">No asistirán</option>
           <option value="sent">Enviadas</option>
           <option value="unsent">Sin enviar</option>
+          <option value="reminded">Con recordatorio</option>
           <option value="inactive">Inactivas</option>
         </select>
       </div>
@@ -414,6 +463,11 @@ export default function AdminClient() {
                         <div className={`deliveryText ${row.sent_at ? "deliverySent" : ""}`}>
                           {row.sent_at ? `Enviada · ${new Date(row.sent_at).toLocaleDateString("es-MX")}` : "Sin enviar"}
                         </div>
+                        {row.reminder_sent_at && (
+                          <div className="deliveryText reminderSent">
+                            Recordatorio · {new Date(row.reminder_sent_at).toLocaleDateString("es-MX")}
+                          </div>
+                        )}
                       </>
                     )}
                   </td>
@@ -424,7 +478,12 @@ export default function AdminClient() {
                       </select>
                     ) : row.guest_limit}
                   </td>
-                  <td>{row.confirmed_guests ?? "—"}</td>
+                  <td>
+                    {row.confirmed_guests ?? "—"}
+                    {row.response_updated_at && (
+                      <div className="responseDate">{new Date(row.response_updated_at).toLocaleDateString("es-MX")}</div>
+                    )}
+                  </td>
                   <td><span className={`statusPill ${statusClass}`}>{status}</span></td>
                   <td>
                     <div className="linkActions">
@@ -445,6 +504,16 @@ export default function AdminClient() {
                           >
                             WhatsApp
                           </button>
+                          {row.attending === null && (
+                            <button
+                              className="miniButton reminderButton"
+                              onClick={() => openReminder(row)}
+                              disabled={!row.whatsapp_phone}
+                              title={row.whatsapp_phone ? "Enviar recordatorio de confirmación" : "Esta invitación no tiene WhatsApp"}
+                            >
+                              {row.reminder_sent_at ? "Reenviar recordatorio" : "Recordar"}
+                            </button>
+                          )}
                           <button className="miniButton" onClick={() => copyLink(row.token)}>
                             {copiedToken === row.token ? "Copiado" : "Copiar"}
                           </button>

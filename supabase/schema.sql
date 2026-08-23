@@ -8,6 +8,7 @@ create table if not exists public.invitations (
   whatsapp_phone text,
   active boolean not null default true,
   sent_at timestamptz,
+  reminder_sent_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

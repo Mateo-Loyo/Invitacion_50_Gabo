@@ -19,6 +19,9 @@ const HOTELS = [
   ["One Guadalajara Periférico Poniente", "https://www.google.com/maps/search/?api=1&query=One+Guadalajara+Periferico+Poniente"]
 ] as const;
 
+const RSVP_DEADLINE = new Date("2026-09-25T23:59:59-06:00");
+const RSVP_DEADLINE_TEXT = "25 de septiembre de 2026";
+
 export default function InvitationClient({ token }: { token: string }) {
   const [invite, setInvite] = useState<Invite | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,6 +120,7 @@ export default function InvitationClient({ token }: { token: string }) {
   const plural = invite.guest_limit > 1;
   const hasResponse = invite.attending !== null;
   const currentConfirmed = invite.confirmed_guests || 0;
+  const deadlinePassed = Date.now() > RSVP_DEADLINE.getTime();
 
   return (
     <main className="site">
@@ -184,6 +188,11 @@ export default function InvitationClient({ token }: { token: string }) {
       <section className="section rsvp" id="rsvp">
         <div className="contentLayer">
           <div className="eyebrow">Confirmación de asistencia</div><div className="rule" />
+          <div className={`rsvpDeadline ${deadlinePassed ? "deadlinePassed" : ""}`}>
+            <span>{deadlinePassed ? "Fecha sugerida concluida" : "Confirma antes del"}</span>
+            <strong className="serif">{RSVP_DEADLINE_TEXT}</strong>
+            {deadlinePassed && <em>Aún puedes registrar o modificar tu respuesta.</em>}
+          </div>
           <div className="card rsvpCard">
             <div className="family script">{invite.display_name}</div>
             <p className="reserved serif">
@@ -198,7 +207,7 @@ export default function InvitationClient({ token }: { token: string }) {
             </div>
             {attending === true && <div className="pickerWrap"><div className="serif">{plural ? "¿Cuántos me acompañarán?" : "Tu lugar está reservado"}</div>{plural ? <><div className="picker"><button className="round" onClick={() => { setGuests(Math.max(1, guests - 1)); setSavedNow(false); }} aria-label="Restar persona">−</button><div className="guestNum serif">{guests}</div><button className="round" onClick={() => { setGuests(Math.min(invite.guest_limit, guests + 1)); setSavedNow(false); }} aria-label="Agregar persona">+</button></div><div className="note">Máximo autorizado: {invite.guest_limit} personas.</div></> : <div className="singleGuestMark"><span>✓</span> 1 persona</div>}</div>}
             <button className="btn primary confirmButton" onClick={confirm} disabled={saving}>{saving ? "Guardando..." : hasResponse ? "Actualizar confirmación" : "Confirmar asistencia"}</button>
-            {savedNow && <div className="confirmationSuccess" role="status"><div className="successIcon">✓</div><div><strong className="serif">Tu respuesta quedó guardada</strong><p>{attending ? `Confirmamos ${guests} ${guests === 1 ? "lugar" : "lugares"}.` : "Gracias por avisarme."}</p></div></div>}
+            {savedNow && <div className="confirmationSuccess" role="status"><div className="successIcon">✓</div><div><strong className="serif">Tu respuesta quedó guardada</strong><p>{attending ? `Confirmamos ${guests} ${guests === 1 ? "lugar" : "lugares"}.` : "Gracias por avisarme."}</p><small>Puedes modificar tu respuesta en cualquier momento desde este mismo enlace.</small></div></div>}
             {message && <div className="note errorNote" role="status">{message}</div>}
           </div>
         </div>
@@ -214,3 +223,4 @@ export default function InvitationClient({ token }: { token: string }) {
 function Count({ number, label, pad = false }: { number: number; label: string; pad?: boolean }) {
   return <div className="count"><div className="n serif">{pad ? String(number).padStart(2, "0") : number}</div><div className="l">{label}</div></div>;
 }
+

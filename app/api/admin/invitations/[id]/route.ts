@@ -75,6 +75,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (body.mark_sent === true) update.sent_at = new Date().toISOString();
   if (body.mark_sent === false) update.sent_at = null;
+  if (body.mark_reminder === true) update.reminder_sent_at = new Date().toISOString();
+  if (body.mark_reminder === false) update.reminder_sent_at = null;
 
   try {
     await supabaseRequest<void>(`invitations?id=eq.${encodeURIComponent(auth.id)}`, {
@@ -82,7 +84,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       body: update,
       prefer: "return=minimal"
     });
-    return NextResponse.json({ ok: true, sent_at: update.sent_at ?? undefined });
+    return NextResponse.json({
+      ok: true,
+      sent_at: update.sent_at ?? undefined,
+      reminder_sent_at: update.reminder_sent_at ?? undefined
+    });
   } catch {
     return NextResponse.json({ ok: false, error: "No se pudo actualizar la invitación." }, { status: 500 });
   }

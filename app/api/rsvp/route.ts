@@ -31,17 +31,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Número de asistentes no permitido." }, { status: 400 });
     }
 
+    const updatedAt = new Date().toISOString();
     await supabaseRequest<void>("rsvps?on_conflict=invite_id", {
       method: "POST",
       body: {
         invite_id: invite.id,
         attending,
         confirmed_guests: confirmedGuests,
-        updated_at: new Date().toISOString()
+        updated_at: updatedAt
       },
       prefer: "resolution=merge-duplicates,return=minimal"
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, updated_at: updatedAt });
   } catch {
     return NextResponse.json({ ok: false, error: "No fue posible guardar la confirmación." }, { status: 500 });
   }
