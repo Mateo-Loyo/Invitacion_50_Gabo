@@ -4,11 +4,21 @@ Invitación privada con enlaces individuales, RSVP, límite de asistentes, Whats
 
 ## Funciones de operación
 
-- Confirmación modificable con fecha límite sugerida.
+- Confirmación modificable desde el mismo enlace personal.
 - Seguimiento de envío y recordatorio por WhatsApp.
 - Registro de primera apertura, última apertura y total de aperturas por invitación.
 - Filtros, tasa de respuesta y exportación CSV desde `/admin`.
 - El seguimiento no almacena IP, ubicación, navegador ni información adicional del invitado.
+
+## Recorrido de la invitación
+
+- Portada cinematográfica, bienvenida personalizada y cuenta regresiva.
+- Lugar con acceso a Google Maps.
+- Recomendación, dress code Cuban vibes y hoteles proporcionados por la organizadora.
+- RSVP individual limitado al número de lugares autorizado.
+- Cierre cinematográfico.
+
+Los apartados sin información aprobada —historia, enlace de calendario, Waze, horarios, sitio para fotografías y taxi ejecutivo— permanecen ocultos hasta recibir su contenido.
 
 ## Configuración
 
