@@ -1,1 +1,97 @@
-@media(prefers-reduced-motion:no-preference){.heroInner{animation:heroReveal 1s ease both}.chev{animation:chevBounce 1.6s ease-in-out infinite}@keyframes heroReveal{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes chevBounce{50%{transform:translateY(6px) rotate(45deg)}}}
+[data-reveal] .contentLayer {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .8s cubic-bezier(.22, 1, .36, 1), transform .8s cubic-bezier(.22, 1, .36, 1);
+}
+
+[data-reveal].isVisible .contentLayer {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+[data-reveal] .sceneImage {
+  transform: scale(1.045);
+  transition: transform 1.8s cubic-bezier(.22, 1, .36, 1);
+}
+
+[data-reveal].isVisible .sceneImage {
+  transform: scale(1.01);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroInner { animation: heroReveal 1.25s cubic-bezier(.22, 1, .36, 1) both; }
+  .heroSceneImage { animation: heroBreath 18s ease-in-out infinite alternate; }
+  .finalSceneImage { animation: finalBreath 20s ease-in-out infinite alternate; }
+  .chev { animation: chevBounce 1.7s ease-in-out infinite; }
+  .filmGrain { animation: grainShift .45s steps(2, end) infinite; }
+  .ambientGlow { animation: glowFloat 8s ease-in-out infinite alternate; }
+  .glowTwo { animation-delay: -3s; }
+  .rule { animation: ruleShimmer 3.8s ease-in-out infinite; }
+  .count:last-child .n { animation: secondPulse 1s ease-in-out infinite; }
+  .palette i { animation: paletteFloat 3.2s ease-in-out infinite; }
+  .palette i:nth-child(2) { animation-delay: -.45s; }
+  .palette i:nth-child(3) { animation-delay: -.9s; }
+  .palette i:nth-child(4) { animation-delay: -1.35s; }
+  .palette i:nth-child(5) { animation-delay: -1.8s; }
+  .hotelCard { transition-delay: calc(var(--hotel-index) * 70ms); }
+  .loadingDot { animation: loadingSpin .8s linear infinite; }
+
+  @keyframes heroReveal {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes heroBreath {
+    from { transform: scale(1.025) translate3d(0, 0, 0); }
+    to { transform: scale(1.065) translate3d(0, -1.1%, 0); }
+  }
+
+  @keyframes finalBreath {
+    from { transform: scale(1.02) translate3d(0, 0, 0); }
+    to { transform: scale(1.055) translate3d(0, -1%, 0); }
+  }
+
+  @keyframes chevBounce {
+    50% { transform: translateY(6px) rotate(45deg); }
+  }
+
+  @keyframes grainShift {
+    0% { transform: translate3d(-2%, 1%, 0); }
+    50% { transform: translate3d(2%, -1%, 0); }
+    100% { transform: translate3d(0, 2%, 0); }
+  }
+
+  @keyframes glowFloat {
+    from { transform: translate3d(0, -8px, 0) scale(.92); opacity: .35; }
+    to { transform: translate3d(8px, 12px, 0) scale(1.08); opacity: .62; }
+  }
+
+  @keyframes ruleShimmer {
+    0%, 100% { opacity: .68; filter: brightness(.9); }
+    50% { opacity: 1; filter: brightness(1.25); }
+  }
+
+  @keyframes secondPulse {
+    0%, 100% { opacity: .82; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes paletteFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  @keyframes loadingSpin {
+    to { transform: rotate(360deg); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  [data-reveal] .contentLayer { opacity: 1; transform: none; transition: none; }
+  [data-reveal] .sceneImage,
+  [data-reveal].isVisible .sceneImage { transform: none; transition: none; }
+  .heroSceneImage,
+  .finalSceneImage { transform: none; }
+  .loadingDot { border-color: #deb55c; }
+}

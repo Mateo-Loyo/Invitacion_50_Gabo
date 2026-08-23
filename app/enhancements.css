@@ -1,18 +1,46 @@
-.btn,.hotelCard,.calendarButton,.choice label{transition:transform .2s ease,filter .2s ease,background .2s ease}.btn:hover,.hotelCard:hover,.calendarButton:hover{transform:translateY(-2px);filter:brightness(1.05)}.confirmButton:disabled{opacity:.62;cursor:wait}
+.btn,
+.hotelCard,
+.choice label,
+.round,
+.adminGhostButton,
+.miniButton,
+.miniLink {
+  transition: transform .22s ease, filter .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
 
-.rsvpDeadline{width:min(92%,520px);margin:0 auto 1.2rem;padding:1rem 1.2rem;border:1px solid rgba(191,145,55,.45);border-radius:14px;background:rgba(17,25,22,.72);display:flex;flex-direction:column;align-items:center;gap:.3rem;text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.15)}
-.rsvpDeadline span{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:#d5c7aa}
-.rsvpDeadline strong{font-size:1.25rem;color:#e0b65f;font-weight:500}
-.rsvpDeadline em{font-size:.78rem;color:#d7d0c2}
-.rsvpDeadline.deadlinePassed{border-color:rgba(211,165,76,.72)}
-.confirmationSuccess small{display:block;margin-top:.35rem;line-height:1.45;color:#d5cdbd}
+.btn:hover,
+.hotelCard:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
+}
 
-.choiceFieldset{margin:0;padding:0;border:0;min-width:0}
-.choiceFieldset .question{display:block;width:100%}
-.invitationState{gap:.7rem;padding:32px;text-align:center;background:radial-gradient(circle at 50% 30%,rgba(189,145,60,.12),transparent 44%),#16231f;color:#f4ead5}
-.invitationState h1{margin:0;font-size:1.65rem;font-weight:500}
-.invitationState p{max-width:430px;margin:0 0 .45rem;color:#d8cfbd;line-height:1.55}
-.stateMark{color:#d5a548;font-size:1.6rem}
-.loadingDot{width:26px;height:26px;border:2px solid rgba(222,181,92,.3);border-top-color:#deb55c;border-radius:50%;animation:loadingSpin .8s linear infinite}
-@keyframes loadingSpin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.loadingDot{animation:none}.btn,.hotelCard,.calendarButton,.choice label{transition:none}}
+.choice label:hover { border-color: rgba(169, 111, 24, .6); }
+.round:hover { transform: scale(1.06); filter: brightness(1.12); }
+
+.btn:focus-visible,
+.hotelCard:focus-visible,
+.choice input:focus-visible,
+.round:focus-visible,
+.adminGhostButton:focus-visible,
+.miniButton:focus-visible,
+.miniLink:focus-visible,
+.textInput:focus-visible {
+  outline: 3px solid rgba(241, 197, 102, .82);
+  outline-offset: 3px;
+}
+
+@media (hover: none) {
+  .btn:hover,
+  .hotelCard:hover,
+  .round:hover { transform: none; filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .hotelCard,
+  .choice label,
+  .round,
+  .adminGhostButton,
+  .miniButton,
+  .miniLink { transition: none; }
+}
